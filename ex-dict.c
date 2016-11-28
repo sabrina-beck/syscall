@@ -19,8 +19,9 @@ int getOptionFromMenu() {
 }
 
 void setNewKey() {
-  char* value = malloc(MAX_SIZE * sizeof(char));
-  int r, key, lifespan;
+  char value[MAX_SIZE];
+  int key, lifespan;
+  long r;
 
   printf("\nKey: ");
   scanf("%d", &key);
@@ -28,26 +29,33 @@ void setNewKey() {
   scanf("%s", value);
   printf("Lifespan (seconds): ");
   scanf("%d", &lifespan);
+
   r = syscall(380, key, value, lifespan);
-  if (r == 0)
+  
+  if (r == 0) {
     printf("Success\n");
-  else
-    printf("Error\n");
-  free(value);
+  } else {
+    printf("Could not set the new key, the key may already exist or we have an error\n");
+  }
 }
 
 void getKey() {
-  char* value = malloc(MAX_SIZE * sizeof(char));
-  int r, key, size;
+  char* value = malloc((MAX_SIZE + 1) * sizeof(char));
+  int key, size;
+  long r;
   printf("\nKey: ");
   scanf("%d", &key);
   printf("Size: ");
   scanf("%d", &size);
   r = syscall(381, key, size, value);
-  if (r == 0)
+  value[size] = '\0';
+  if (r == 0) {
     printf("Success. Value: %s\n", value);
-  else
-    printf("Error finding the key: %d\n", key);
+  } else {
+    printf("Could not find the key: %d\n", key);
+    printf("The key may be expired or never existed.");
+  }
+
   free(value);
 }
 
@@ -58,12 +66,15 @@ int main() {
     option = getOptionFromMenu();
 
     switch(option) {
+      case 0: break;
       case 1:
         setNewKey();
         break;
       case 2:
         getKey();
         break;
+      default:
+        printf("Invalid option!\n");
     }
     printf("\n\n");
   } while (option != 0);

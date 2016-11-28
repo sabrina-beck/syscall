@@ -70,7 +70,13 @@ void add(LinkedList* list, Node* newNode) {
 bool remove(LinkedList* list, Node* node) {
     Node* currentNode = list->head;
 
-    if(node == NULL) {
+    if(node == NULL || currentNode == NULL) {
+        return true;
+    }
+
+    if(list->head == node) {
+        list->head = list->head->next;
+        kfree(node);
         return true;
     }
 
@@ -78,6 +84,7 @@ bool remove(LinkedList* list, Node* node) {
         if(currentNode->next == node) {
             currentNode->next = node->next;
             list->size -= 1;
+            kfree(node);
             return true;
         }
         currentNode = currentNode->next;
@@ -106,12 +113,16 @@ HashTable* newHashTable(unsigned int size) {
 }
 
 bool isExpired(Node* node) {
-    return node->createdAt + node->lifespan * HZ > jiffies;
+    return (node->createdAt / HZ) + node->lifespan < (jiffies / HZ);
 }
 
 //search for the Knuth's multiplicative method
 unsigned int hashCode(int key) {
-    return key;
+    if(key < 0) {
+        key = -key;
+    }
+
+    return key % HASH_SIZE;
 }
 
 /********** Auxiliary **********/
@@ -120,7 +131,10 @@ char* toKernel(char* value) {
 
     char* kernelValue = kmalloc(size * sizeof(char), GFP_KERNEL);
     
-    strncpy_from_user(kernelValue, value, size);
+    int copyResult = strncpy_from_user(kernelValue, value, size);
+    if(copyResult == -EFAULT) {
+        return NULL;
+    }
 
     return kernelValue;
 }
@@ -134,6 +148,7 @@ asmlinkage long sys_settmpkey(int key, char* value, unsigned int lifespan) {
     Node* node;
     unsigned int code;
     LinkedList* hashCodeBucket;
+    char* kernelValue;
 
     //FIXME find better way to initialize the hash table
     if(hashTable == NULL) {
@@ -144,11 +159,21 @@ asmlinkage long sys_settmpkey(int key, char* value, unsigned int lifespan) {
     hashCodeBucket = hashTable->table[code];
 
     node = findByKey(hashCodeBucket, key);
+    
+    if(node != NULL && !isExpired(node)) {
+        return -1;
+
+    }
     if(node != NULL) {
+        remove(hashCodeBucket, node);
+    }
+
+    kernelValue = toKernel(value);
+    if(kernelValue == NULL) {
         return -1;
     }
 
-    newNode = newElement(key, toKernel(value), lifespan);
+    newNode = newElement(key, kernelValue, lifespan);
     add(hashCodeBucket, newNode);
 
     return 0;
@@ -175,11 +200,10 @@ asmlinkage long sys_gettmpkey(int key, int n, char* value) {
         return 1;
     }
 
-    //FIXME is not working
-    //if(isExpired(node)) {
-    //    remove(hashCodeBucket, node);
-    //    return 1;
-    //}
+    if(isExpired(node)) {
+        remove(hashCodeBucket, node);
+        return 1;
+    }
 
     return copy_to_user(value, node->value, n);
 }
