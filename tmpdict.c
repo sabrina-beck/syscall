@@ -29,6 +29,7 @@ Node* newElement(int key, char* value, unsigned int lifespan) {
     node->value = value;
     node->lifespan = lifespan;
     node->createdAt = jiffies;
+    node->next = NULL;
     return node;
 }
 
