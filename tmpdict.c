@@ -32,12 +32,6 @@ Node* newElement(int key, char* value, unsigned int lifespan) {
     return node;
 }
 
-LinkedList* newLinkedList(void) {
-    LinkedList* list = kmalloc(sizeof(LinkedList), GFP_KERNEL);
-    list->head = NULL;
-    return list;
-}
-
 Node* findByKey(LinkedList* list, int key) {
     Node* currentNode = list->head;
     while(currentNode != NULL) {
@@ -74,6 +68,7 @@ bool remove(LinkedList* list, Node* node) {
 
     if(list->head == node) {
         list->head = list->head->next;
+        kfree(node->value);
         kfree(node);
         return true;
     }
@@ -81,6 +76,7 @@ bool remove(LinkedList* list, Node* node) {
     while(currentNode != NULL) {
         if(currentNode->next == node) {
             currentNode->next = node->next;
+            kfree(node->value);
             kfree(node);
             return true;
         }
