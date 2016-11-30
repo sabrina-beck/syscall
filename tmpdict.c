@@ -20,7 +20,6 @@ typedef struct Node {
 
 typedef struct LinkedList {
     Node* head;
-    int size;
 } LinkedList;
 
 Node* newElement(int key, char* value, unsigned int lifespan) {
@@ -36,7 +35,6 @@ Node* newElement(int key, char* value, unsigned int lifespan) {
 LinkedList* newLinkedList(void) {
     LinkedList* list = kmalloc(sizeof(LinkedList), GFP_KERNEL);
     list->head = NULL;
-    list->size = 0;
     return list;
 }
 
@@ -65,7 +63,6 @@ void add(LinkedList* list, Node* newNode) {
     }
 
     currentNode->next = newNode;
-    list->size += 1;
 }
 
 bool remove(LinkedList* list, Node* node) {
@@ -84,7 +81,6 @@ bool remove(LinkedList* list, Node* node) {
     while(currentNode != NULL) {
         if(currentNode->next == node) {
             currentNode->next = node->next;
-            list->size -= 1;
             kfree(node);
             return true;
         }
@@ -96,22 +92,8 @@ bool remove(LinkedList* list, Node* node) {
 
 /********** Hash Map **********/
 typedef struct HashTable {
-    LinkedList** table;
+    LinkedList table[HASH_SIZE];
 } HashTable;
-
-HashTable* newHashTable(unsigned int size) {
-    int i;
-    HashTable* hashTable = kmalloc(sizeof(HashTable), GFP_KERNEL);
-
-    LinkedList** table = kmalloc(size * sizeof(LinkedList*), GFP_KERNEL);
-    
-    for(i = 0; i < size; i++) { 
-        table[i] = newLinkedList();
-    }
-
-    hashTable->table = table;
-    return hashTable;
-}
 
 bool isExpired(Node* node) {
     return (node->createdAt / HZ) + node->lifespan < (jiffies / HZ);
@@ -141,7 +123,7 @@ char* toKernel(char* value) {
 }
 
 /********** System calls **********/
-HashTable* hashTable;
+HashTable hashTable;
 
 /* Retorna 0 se a operação foi bem sucedida e -1 caso contrário. */
 asmlinkage long sys_settmpkey(int key, char* value, unsigned int lifespan) {
@@ -151,20 +133,15 @@ asmlinkage long sys_settmpkey(int key, char* value, unsigned int lifespan) {
     LinkedList* hashCodeBucket;
     char* kernelValue;
 
-    //FIXME find better way to initialize the hash table
-    if(hashTable == NULL) {
-        hashTable = newHashTable(HASH_SIZE);
-    }
-
     code = hashCode(key);
-    hashCodeBucket = hashTable->table[code];
+    hashCodeBucket = &(hashTable.table[code]);
 
     node = findByKey(hashCodeBucket, key);
     
     if(node != NULL && !isExpired(node)) {
         return -1;
-
     }
+
     if(node != NULL) {
         remove(hashCodeBucket, node);
     }
@@ -187,13 +164,8 @@ asmlinkage long sys_gettmpkey(int key, int n, char* value) {
     unsigned int code;
     LinkedList* hashCodeBucket;
 
-    //FIXME find better way to initialize the hash table
-    if(hashTable == NULL) {
-        hashTable = newHashTable(HASH_SIZE);
-    }
-
     code = hashCode(key);
-    hashCodeBucket = hashTable->table[code];    
+    hashCodeBucket = &(hashTable.table[code]);
     
     node = findByKey(hashCodeBucket, key);
 
