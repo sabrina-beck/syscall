@@ -10,6 +10,9 @@
 
 /********** Linked List **********/
 
+/*
+ * Represents a linked list node
+ */
 typedef struct Node {
     int key;
     char* value;
@@ -18,10 +21,16 @@ typedef struct Node {
     struct Node* next;
 } Node;
 
+/*
+ * Represents a linked list
+ */
 typedef struct LinkedList {
     Node* head;
 } LinkedList;
 
+/*
+ * Creates a new linked list node
+ */
 Node* newElement(int key, char* value, unsigned int lifespan) {
     Node* node = kmalloc(sizeof(Node), GFP_KERNEL);
     node->key = key;
@@ -32,6 +41,10 @@ Node* newElement(int key, char* value, unsigned int lifespan) {
     return node;
 }
 
+/*
+ * Returns a node that belongs to the linked list and it is
+ * identified by the desired key
+ */
 Node* findByKey(LinkedList* list, int key) {
     Node* currentNode = list->head;
     while(currentNode != NULL) {
@@ -43,14 +56,19 @@ Node* findByKey(LinkedList* list, int key) {
     return NULL;
 }
 
+/*
+ * Adds a new node to the linked list
+ */
 void add(LinkedList* list, Node* newNode) {
     Node* currentNode;
 
+    // add to the head
     if(list->head == NULL) {
         list->head = newNode;
         return;
     }
 
+    // add in the middle
     currentNode = list->head;
     while(currentNode->next != NULL) {
         currentNode = currentNode->next;
@@ -59,6 +77,9 @@ void add(LinkedList* list, Node* newNode) {
     currentNode->next = newNode;
 }
 
+/*
+ * Removes a node from the linked list
+ */
 bool remove(LinkedList* list, Node* node) {
     Node* currentNode = list->head;
 
@@ -66,6 +87,7 @@ bool remove(LinkedList* list, Node* node) {
         return true;
     }
 
+    // removes from the head
     if(list->head == node) {
         list->head = list->head->next;
         kfree(node->value);
@@ -73,6 +95,7 @@ bool remove(LinkedList* list, Node* node) {
         return true;
     }
 
+    // removes from the middle
     while(currentNode != NULL) {
         if(currentNode->next == node) {
             currentNode->next = node->next;
@@ -87,15 +110,24 @@ bool remove(LinkedList* list, Node* node) {
 }
 
 /********** Hash Map **********/
+/*
+ * Represents a hash table with conflits solved by linked lists
+ */
 typedef struct HashTable {
     LinkedList table[HASH_SIZE];
 } HashTable;
 
+/*
+ * Checks if a node is expired
+ */
 bool isExpired(Node* node) {
     return (node->createdAt / HZ) + node->lifespan < (jiffies / HZ);
 }
 
-//search for the Knuth's multiplicative method
+/*
+ * Hash code used as index of the hash table
+ * works for integer keys, negative and positive
+ */
 unsigned int hashCode(int key) {
     if(key < 0) {
         key = -key;
@@ -105,6 +137,9 @@ unsigned int hashCode(int key) {
 }
 
 /********** Auxiliary **********/
+/*
+ * Copies a string from the user memory to the kernel memory
+ */
 char* toKernel(char* value) {
     long size = strnlen_user(value, STRING_MAX_LEN);
 
@@ -121,7 +156,11 @@ char* toKernel(char* value) {
 /********** System calls **********/
 HashTable hashTable;
 
-/* Retorna 0 se a operação foi bem sucedida e -1 caso contrário. */
+/*
+ * Sets a new temporary key in the hash table
+ * Returns 0 if the operation is successfull
+ * Returns -1 if not.
+ */
 asmlinkage long sys_settmpkey(int key, char* value, unsigned int lifespan) {
     Node* newNode;
     Node* node;
@@ -134,10 +173,13 @@ asmlinkage long sys_settmpkey(int key, char* value, unsigned int lifespan) {
 
     node = findByKey(hashCodeBucket, key);
     
+    // if the key already exist and is not expired, we don't allow to overwrite it
     if(node != NULL && !isExpired(node)) {
         return -1;
     }
 
+    // if the key already exist an it is expired, it should be removed and the new
+    // one should be created
     if(node != NULL) {
         remove(hashCodeBucket, node);
     }
@@ -153,8 +195,10 @@ asmlinkage long sys_settmpkey(int key, char* value, unsigned int lifespan) {
     return 0;
 }
 
-/* Copia em value o valor da chave key com no máximo n caracteres.
-   Retorna 0 se encontrou chave válida e -1 caso contrário. */
+/*
+ * Copies into value the key value in the hash table with a maximum of n characters
+ * Returns 0 if the key is found and is valid and -1 if it isnt
+ */
 asmlinkage long sys_gettmpkey(int key, int n, char* value) {
     Node* node;
     unsigned int code;
@@ -165,7 +209,7 @@ asmlinkage long sys_gettmpkey(int key, int n, char* value) {
     
     node = findByKey(hashCodeBucket, key);
 
-    if(node == NULL) { // didn't found
+    if(node == NULL) {
         return 1;
     }
 

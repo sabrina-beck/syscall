@@ -19,14 +19,15 @@ int getOptionFromMenu() {
 }
 
 void setNewKey() {
-  char value[MAX_SIZE];
+  char value[MAX_SIZE], jl;
   int key, lifespan;
   long r;
 
   printf("\nKey: ");
   scanf("%d", &key);
+  scanf("%c", &jl);
   printf("Value: ");
-  scanf("%s%*c", value);
+  scanf("%[^\t\n]s", value);
   printf("Lifespan (seconds): ");
   scanf("%d", &lifespan);
 
