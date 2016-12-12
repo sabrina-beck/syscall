@@ -210,12 +210,12 @@ asmlinkage long sys_gettmpkey(int key, int n, char* value) {
     node = findByKey(hashCodeBucket, key);
 
     if(node == NULL) {
-        return 1;
+        return -1;
     }
 
     if(isExpired(node)) {
         remove(hashCodeBucket, node);
-        return 1;
+        return -1;
     }
 
     return copy_to_user(value, node->value, n);
